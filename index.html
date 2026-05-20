@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EyeSpeak — Vision Accessibility</title>
+    <meta name="description"
+        content="EyeSpeak is a real-time assistive AI for the visually impaired featuring YOLO object detection and Gemini scene understanding.">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        aura: {
+                            bg: '#07090f',
+                            panel: 'rgba(12, 17, 30, 0.80)',
+                            border: 'rgba(99, 102, 241, 0.12)',
+                            'border-hover': 'rgba(99, 102, 241, 0.30)',
+                            indigo: '#818cf8',
+                            cyan: '#22d3ee',
+                            green: '#34d399',
+                            red: '#f87171',
+                            amber: '#fbbf24',
+                        },
+                    },
+                },
+            },
+        };
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+
+    <style>
+        body {
+            background-color: #07090f;
+            background-image:
+                radial-gradient(ellipse at 15% 50%, rgba(99, 102, 241, 0.06) 0%, transparent 55%),
+                radial-gradient(ellipse at 85% 15%, rgba(34, 211, 238, 0.04) 0%, transparent 55%);
+        }
+
+        /* ── Glassmorphism Panel ──────────────────────────────── */
+        .glass {
+            background: rgba(12, 17, 30, 0.80);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(99, 102, 241, 0.12);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            transition: border-color 0.3s ease;
+        }
+
+        .glass:hover {
+            border-color: rgba(99, 102, 241, 0.25);
+        }
+
+        /* ── Describe Button ─────────────────────────────────── */
+        .btn-describe {
+            background: linear-gradient(135deg, #6366f1 0%, #818cf8 50%, #a5b4fc 100%);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.40), 0 0 60px rgba(99, 102, 241, 0.15);
+            transition: all 0.25s cubic-bezier(.4, 0, .2, 1);
+        }
+
+        .btn-describe:hover:not(:disabled) {
+            transform: translateY(-2px) scale(1.01);
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.55), 0 0 80px rgba(99, 102, 241, 0.20);
+        }
+
+        .btn-describe:active:not(:disabled) {
+            transform: translateY(0) scale(0.99);
+        }
+
+        .btn-describe:disabled {
+            background: linear-gradient(135deg, #374151, #4b5563);
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* ── Animations ──────────────────────────────────────── */
+        @keyframes pulseGlow {
+
+            0%,
+            100% {
+                opacity: 1;
+                box-shadow: 0 0 8px rgba(99, 102, 241, 0.3);
+            }
+
+            50% {
+                opacity: 0.6;
+                box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+            }
+        }
+
+        .pulse-glow {
+            animation: pulseGlow 2s cubic-bezier(.4, 0, .6, 1) infinite;
+        }
+
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeSlideIn 0.35s ease-out;
+        }
+
+        @keyframes dotPulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.35;
+            }
+        }
+
+        @keyframes scanLine {
+            0% {
+                transform: translateY(-100%);
+            }
+
+            100% {
+                transform: translateY(480px);
+            }
+        }
+
+        .scan-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.5), transparent);
+            animation: scanLine 2s linear infinite;
+            pointer-events: none;
+        }
+
+        /* ── Video Feed ──────────────────────────────────────── */
+        .video-container {
+            position: relative;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: #000;
+        }
+
+        #video-feed {
+            width: 100%;
+            display: block;
+            border-radius: 0.75rem;
+            aspect-ratio: 4/3;
+            object-fit: cover;
+            background: #000;
+        }
+
+        /* ── Scrollbar ───────────────────────────────────────── */
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.3);
+            border-radius: 4px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.5);
+        }
+
+        /* ── Connection Banner ───────────────────────────────── */
+        #connection-banner {
+            display: none;
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(220, 38, 38, 0.9);
+            color: white;
+            padding: 0.5rem 2rem;
+            border-radius: 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            z-index: 999;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 24px rgba(220, 38, 38, 0.5);
+        }
+
+        /* ── Proximity Badges ────────────────────────────────── */
+        .prox-close {
+            background: rgba(248, 113, 113, 0.12);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.25);
+        }
+
+        .prox-safe {
+            background: rgba(34, 211, 238, 0.10);
+            color: #22d3ee;
+            border: 1px solid rgba(34, 211, 238, 0.20);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen font-sans text-slate-100 p-4 md:p-6 lg:p-8">
+
+    <div id="connection-banner">⚠ Connection lost — reconnecting…</div>
+
+    <div class="max-w-7xl mx-auto">
+
+        <header
+            class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-white/5 pb-5 gap-4">
+            <div>
+                <h1
+                    class="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                    EyeSpeak
+                </h1>
+                <p class="text-slate-500 text-sm mt-1 tracking-wide">
+                    Real-Time Spatial Awareness · Gemini Scene Intelligence
+                </p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="voice-indicator"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/15">
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"
+                        style="animation: dotPulse 1.5s ease-in-out infinite;"></span>
+                    🎤 Listening
+                </span>
+                <span id="system-status"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"
+                        style="animation: dotPulse 2s infinite;"></span>
+                    System Online
+                </span>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <div class="lg:col-span-2 flex flex-col gap-5">
+                <div class="glass rounded-2xl p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xs font-semibold tracking-widest uppercase text-slate-500">
+                            Live Feed — YOLO-World
+                        </h2>
+                        <div class="flex items-center gap-2">
+                            <span id="yolo-badge"
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.65rem] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 transition-all">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                YOLO ACTIVE
+                            </span>
+                            <span id="fps-display"
+                                class="font-mono text-xs text-cyan-400 bg-black/40 px-2.5 py-1 rounded-md">
+                                FPS: --
+                            </span>
+                        </div>
+                    </div>
+                    <div class="video-container">
+                        <img id="video-feed" alt="Live Camera Feed" src="">
+                        <div id="scan-overlay" class="hidden">
+                            <div class="scan-line"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="scan-btn" onclick="triggerDeepScan()"
+                    class="btn-describe w-full py-5 rounded-2xl text-white text-lg md:text-xl font-bold tracking-wide uppercase cursor-pointer border-0 select-none"
+                    aria-label="Describe your surroundings using AI">
+                    🔭 Describe Surroundings
+                </button>
+
+                <div class="glass rounded-2xl p-5">
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-xs font-semibold tracking-widest uppercase text-indigo-400">
+                            🧠 Gemini Scene Analysis
+                        </h2>
+                        <span id="vlm-status"
+                            class="font-mono text-xs text-slate-500 bg-slate-800/60 px-2.5 py-1 rounded-md">
+                            Idle
+                        </span>
+                    </div>
+                    <div id="vlm-text"
+                        class="bg-black/30 p-5 rounded-xl border border-white/[0.04] font-mono text-sm text-slate-400 min-h-[80px] max-h-[160px] overflow-y-auto custom-scroll leading-relaxed transition-all">
+                        Press the button or say "EyeSpeak describe" to analyze surroundings…
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-5">
+                <div class="glass rounded-2xl p-5 flex-grow">
+                    <h2 class="text-xs font-semibold tracking-widest uppercase text-slate-500 mb-4">
+                        🎯 Detected Objects
+                    </h2>
+                    <div id="objects-list" class="flex flex-col gap-3 custom-scroll overflow-y-auto"
+                        style="max-height: 460px;">
+                        <p class="text-slate-500 text-sm italic">Initializing detector…</p>
+                    </div>
+                </div>
+
+                <div class="glass rounded-2xl p-5">
+                    <h2 class="text-xs font-semibold tracking-widest uppercase text-slate-500 mb-3">
+                        ⚙ Architecture
+                    </h2>
+                    <div class="space-y-2.5 text-xs text-slate-500">
+                        <div class="flex justify-between">
+                            <span>Tier 1 (Reflex)</span>
+                            <span class="font-mono text-cyan-400">YOLO-World · MPS</span>
+                        </div>
+                        <div class="w-full h-px bg-white/5"></div>
+                        <div class="flex justify-between">
+                            <span>Tier 2 (Cognition)</span>
+                            <span class="font-mono text-indigo-400">Gemini 1.5 Flash</span>
+                        </div>
+                        <div class="w-full h-px bg-white/5"></div>
+                        <div class="flex justify-between">
+                            <span>Transport</span>
+                            <span class="font-mono text-slate-400">WebSocket · Base64</span>
+                        </div>
+                        <div class="w-full h-px bg-white/5"></div>
+                        <div class="flex justify-between">
+                            <span>TTS Engine</span>
+                            <span class="font-mono text-slate-400">macOS · say</span>
+                        </div>
+                        <div class="w-full h-px bg-white/5"></div>
+                        <div class="flex justify-between">
+                            <span>Voice Input</span>
+                            <span class="font-mono text-slate-400">Web Speech API</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-10 text-center py-4 border-t border-white/[0.03]">
+            <p class="text-[0.7rem] text-slate-600">
+                EyeSpeak Vision Accessibility · YOLO-World + Gemini 1.5 Flash · B.Tech Minor Project
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        const socket = io({
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: Infinity,
+        });
+
+        const banner = document.getElementById('connection-banner');
+        const videoFeed = document.getElementById('video-feed');
+
+        socket.on('connect', () => {
+            banner.style.display = 'none';
+        });
+        socket.on('disconnect', () => {
+            banner.style.display = 'block';
+        });
+        socket.on('connect_error', () => {
+            banner.style.display = 'block';
+        });
+
+        socket.on('video_frame', (data) => {
+            videoFeed.src = 'data:image/jpeg;base64,' + data.image;
+        });
+
+        socket.on('camera_error', (data) => {
+            videoFeed.alt = data.error || 'Camera error';
+        });
+
+        socket.on('stats_update', (data) => {
+            document.getElementById('fps-display').innerText = 'FPS: ' + data.fps;
+
+            const badge = document.getElementById('yolo-badge');
+            if (data.paused) {
+                badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> YOLO PAUSED';
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.65rem] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 transition-all';
+            } else {
+                badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> YOLO ACTIVE';
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.65rem] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 transition-all';
+            }
+
+            const container = document.getElementById('objects-list');
+            if (!data.objects || data.objects.length === 0) {
+                container.innerHTML = '<p class="text-slate-500 text-sm italic">No objects in frame</p>';
+            } else {
+                container.innerHTML = data.objects.map(obj => {
+                    const proxClass = obj.close ? 'prox-close' : 'prox-safe';
+                    const proxLabel = obj.close ? '⚠ CLOSE' : '✓ SAFE';
+                    const barBg = obj.close
+                        ? 'linear-gradient(90deg, #f87171, #ef4444)'
+                        : 'linear-gradient(90deg, #818cf8, #6366f1)';
+                    const posIcon = obj.position === 'left' ? '←' : obj.position === 'right' ? '→' : '↑';
+                    return `
+                        <div class="fade-in">
+                            <div class="flex justify-between items-center mb-1.5">
+                                <span class="text-sm font-medium capitalize">${obj.label}</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[0.6rem] text-slate-500 font-mono">${posIcon} ${obj.position}</span>
+                                    <span class="px-2 py-0.5 rounded text-[0.6rem] font-semibold ${proxClass}">${proxLabel}</span>
+                                    <span class="font-mono text-[0.65rem] text-slate-500">${obj.confidence}%</span>
+                                </div>
+                            </div>
+                            <div class="w-full h-[3px] bg-white/5 rounded-full overflow-hidden">
+                                <div class="h-full rounded-full transition-all duration-300" style="width:${obj.confidence}%; background:${barBg};"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        });
+
+        socket.on('vlm_status', (data) => {
+            const statusEl = document.getElementById('vlm-status');
+            const textEl = document.getElementById('vlm-text');
+            const scanBtn = document.getElementById('scan-btn');
+            const overlay = document.getElementById('scan-overlay');
+
+            statusEl.innerText = data.status;
+            textEl.innerText = data.text;
+
+            if (data.status === 'Scanning') {
+                statusEl.style.color = '#818cf8';
+                statusEl.classList.add('pulse-glow');
+                textEl.style.color = '#94a3b8';
+                overlay.classList.remove('hidden');
+            } else {
+                statusEl.classList.remove('pulse-glow');
+                overlay.classList.add('hidden');
+                scanBtn.disabled = false;
+                scanBtn.innerText = '🔭 DESCRIBE SURROUNDINGS';
+
+                if (data.status === 'Error') {
+                    statusEl.style.color = '#f87171';
+                    textEl.style.color = '#f87171';
+                } else {
+                    statusEl.style.color = '#34d399';
+                    textEl.style.color = '#e2e8f0';
+                }
+            }
+        });
+
+        let scanCooldown = false;
+        function triggerDeepScan() {
+            if (scanCooldown) return;
+            const btn = document.getElementById('scan-btn');
+            btn.disabled = true;
+            btn.innerText = '⏳ ANALYZING…';
+            socket.emit('trigger_scan');
+            scanCooldown = true;
+            setTimeout(() => { scanCooldown = false; }, 3000);
+        }
+
+        // Voice Commands
+        (function initVoiceCommands() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const indicator = document.getElementById('voice-indicator');
+
+            if (!SpeechRecognition) {
+                indicator.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-red-400 opacity-50"></span> Voice N/A';
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = (event) => {
+                const last = event.results[event.results.length - 1];
+                if (!last.isFinal) return;
+                const transcript = last[0].transcript.trim().toLowerCase();
+
+                if (transcript.includes('aura') && (transcript.includes('describe') || transcript.includes('scan'))) {
+                    triggerDeepScan();
+                }
+            };
+
+            // Vital fix for Safari: Restarts recognition if the browser sleeps the tab
+            recognition.onend = () => {
+                setTimeout(() => {
+                    try { recognition.start(); } catch (e) { }
+                }, 1000);
+            };
+
+            recognition.onerror = (event) => {
+                if (event.error === 'not-allowed') {
+                    indicator.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-red-400 opacity-50"></span> 🎤 Mic Denied';
+                }
+            };
+
+            try {
+                recognition.start();
+            } catch (e) { }
+        })();
+    </script>
+</body>
+
+</html>
