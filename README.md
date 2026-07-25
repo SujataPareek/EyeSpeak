@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🔮 Aura: Vision Accessibility Core
+# 👁️ # EyeSpeak: AI Vision Assistant for the Visually Impaired
 
-### A 100% Offline, Privacy-First Assistive AI System for the Visually Impaired
+### ### An Offline AI-Powered Vision Assistant for Real-Time Object Detection, OCR, and Scene Understanding
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776ab?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![YOLO](https://img.shields.io/badge/YOLOv11m-Object_Detection-00d4aa?style=flat-square)](https://docs.ultralytics.com)
@@ -34,7 +34,7 @@
 
 ## 🎯 Executive Summary
 
-**Aura** is an edge-deployed assistive AI system designed to serve as a **real-time spatial awareness tool** for visually impaired individuals. Unlike cloud-dependent solutions that introduce network latency and privacy risks, Aura executes **100% of its AI inference pipeline locally** on consumer hardware — specifically optimized for Apple Silicon MacBooks via Metal Performance Shaders (MPS).
+**Eyespeak** is an edge-deployed assistive AI system designed to serve as a **real-time spatial awareness tool** for visually impaired individuals. Unlike cloud-dependent solutions that introduce network latency and privacy risks, Eyespeak executes **100% of its AI inference pipeline locally** on consumer hardware — specifically optimized for Apple Silicon MacBooks via Metal Performance Shaders (MPS).
 
 The system provides three core capabilities:
 
@@ -58,13 +58,13 @@ The World Health Organization estimates that **2.2 billion people** globally hav
 
 3. **Latency**: Cloud round-trip times of 200-500ms are acceptable for search queries but dangerous for spatial navigation. A 500ms delay in warning a user about an approaching obstacle can mean the difference between stopping safely and a collision.
 
-**Aura eliminates all three problems** by moving the entire inference pipeline to the edge device.
+**Eyespeak eliminates all three problems** by moving the entire inference pipeline to the edge device.
 
 ---
 
 ## 🏗️ Dual-Tier Edge Architecture
 
-Aura implements a **Dual-Tier Edge Architecture** that separates the inference pipeline into two cognitively distinct layers, each optimized for a different latency/depth tradeoff:
+Eyespeak implements a **Dual-Tier Edge Architecture** that separates the inference pipeline into two cognitively distinct layers, each optimized for a different latency/depth tradeoff:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -133,7 +133,7 @@ This separation is inspired by **Daniel Kahneman's Dual Process Theory** (System
 
 ### 1. Privacy by Architecture
 
-Unlike cloud-based assistive tools, Aura's privacy guarantee is **architectural, not policy-based**. No camera frame ever leaves the device — not because of a terms-of-service promise, but because the network stack is never invoked. This is a meaningful distinction for users who:
+Unlike cloud-based assistive tools, Eyespeak's privacy guarantee is **architectural, not policy-based**. No camera frame ever leaves the device — not because of a terms-of-service promise, but because the network stack is never invoked. This is a meaningful distinction for users who:
 
 - Cannot visually verify what their camera is capturing
 - May be in private medical, legal, or intimate settings
@@ -141,7 +141,7 @@ Unlike cloud-based assistive tools, Aura's privacy guarantee is **architectural,
 
 ### 2. Zero Network Dependency
 
-Aura functions identically whether the user has:
+Eyespeak functions identically whether the user has:
 - Full 5G connectivity
 - Spotty Wi-Fi in a basement
 - No connectivity at all (airplane mode)
@@ -152,7 +152,7 @@ This is critical because the environments where visually impaired users need the
 
 Cloud inference latency is inherently variable (50ms–2000ms depending on server load, network conditions, and geographic distance). For an obstacle warning system, variable latency is worse than consistently high latency — because the user cannot develop reliable spatial intuition if the system's response time is unpredictable.
 
-Aura's Tier 1 delivers **deterministic ~30ms inference** on Apple MPS, ensuring the user can trust the timing of proximity warnings.
+Eyespeak's Tier 1 delivers **deterministic ~30ms inference** on Apple MPS, ensuring the user can trust the timing of proximity warnings.
 
 ---
 
@@ -167,7 +167,7 @@ Aura's Tier 1 delivers **deterministic ~30ms inference** on Apple MPS, ensuring 
 | **Camera** | Built-in FaceTime | Any USB/built-in webcam |
 | **Disk** | 5 GB free | 10 GB free |
 
-> **Note**: An NVIDIA GPU with CUDA is not required. Aura is specifically optimized for Apple's Metal Performance Shaders (MPS) backend.
+> **Note**: An NVIDIA GPU with CUDA is not required. Eyespeak is specifically optimized for Apple's Metal Performance Shaders (MPS) backend.
 
 ---
 
@@ -206,9 +206,9 @@ ollama pull llama3.2-vision
 ollama serve
 ```
 
-> **Important**: Ollama must be running before starting Aura if you want Tier 2 scene analysis. However, Aura will **degrade gracefully** — Tier 1 detection works perfectly without Ollama.
+> **Important**: Ollama must be running before starting Eyespeak if you want Tier 2 scene analysis. However, Eyespeak will **degrade gracefully** — Tier 1 detection works perfectly without Ollama.
 
-### Step 5: Launch Aura
+### Step 5: Launch Eyespeak
 
 ```bash
 python app.py
@@ -237,7 +237,7 @@ http://localhost:5001
 
 ### Proximity Detection Algorithm
 
-Rather than using computationally expensive monocular depth estimation, Aura implements a **bounding-box area ratio** heuristic:
+Rather than using computationally expensive monocular depth estimation, Eyespeak implements a **bounding-box area ratio** heuristic:
 
 ```python
 area_ratio = (box_width × box_height) / (frame_width × frame_height)
@@ -256,7 +256,7 @@ if area_ratio > 0.30:   # Object fills >30% of frame
 | **WebRTC** | Low latency, P2P | Massive complexity (STUN/TURN/ICE), overkill for localhost |
 | **WebSocket + Base64** ✅ | Non-blocking, bidirectional, simple | ~33% Base64 overhead |
 
-Aura uses WebSocket Base64 streaming because:
+Eyespeak uses WebSocket Base64 streaming because:
 1. The video feed is localhost-only, so Base64's 33% bandwidth overhead is irrelevant
 2. The same WebSocket connection carries video, stats, VLM results, and logs — no connection pool exhaustion
 3. WebRTC's NAT traversal infrastructure (STUN/TURN/ICE) adds zero value for a localhost application
