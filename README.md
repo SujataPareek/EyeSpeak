@@ -1,6 +1,6 @@
 <div align="center">
 
-# 👁️ # EyeSpeak: AI Vision Assistant for the Visually Impaired
+# 👁️ #EyeSpeak: AI Vision Assistant for the Visually Impaired
 
 ### ### An Offline AI-Powered Vision Assistant for Real-Time Object Detection, OCR, and Scene Understanding
 
